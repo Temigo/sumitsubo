@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ p.batch.label }} · Imports · Sumitsubo{% endblock %}
+{% block main %}
+<div class="toolbar"><h1>{{ p.batch.label }}</h1><a class="btn" href="/imports">Back</a></div>
+{% if note %}<div class="note">{{ note }}</div>{% endif %}
+{% if p.skipped %}<div class="note">Not vocabulary, so not read: {{ p.skipped|join(', ') }}.</div>{% endif %}
+<form method="post" action="/imports/{{ p.batch.id }}" style="display:flex;flex-direction:column;gap:16px">
+<div class="label">1. Where the word is</div>
+{% for nt, s in p.samples.items() %}{% set i = loop.index0 %}{% set m = p.mapping.get(nt, {}) %}
+<section class="box"><div class="row"><b>{{ nt }}</b><span class="mute small">{{ s.count|num }} notes{% if nt in p.fixed %} &middot; kanji: progress only, given to each reading{% endif %}</span></div>
+ <div class="row" style="margin:10px 0;gap:14px{% if nt in p.fixed %};display:none{% endif %}">{% for key, label in [('word','Word'), ('reading','Reading'), ('sentence','Example sentence')] %}
+  <label class="field">{{ label }}<select name="map-{{ i }}-{{ key }}"><option value="">{{ 'none' if key != 'word' else 'choose' }}</option>
+   {% for f in s.fields %}<option value="{{ loop.index0 }}" {{ 'selected' if m.get(key) == loop.index0 }}>{{ f }}</option>{% endfor %}</select></label>{% endfor %}</div>
+ <table class="small" style="border:0">{% for row in s.rows %}{% set e = s.parsed[loop.index0] %}<tr>{% for v in row[:5] %}<td class="mute">{{ v }}</td>{% endfor %}
+  <td>&rarr; {% if e %}<b class="ja">{{ e[0] }}</b>{% if e[1] %}【{{ e[1] }}】{% endif %}{% if e[2] %} <span class="mute">{{ e[2][:30] }}</span>{% endif %}{% else %}<span class="err">no single word found</span>{% endif %}</td></tr>{% endfor %}</table>
+</section>{% endfor %}
+
+<div class="label">2. What to take from each deck</div>
+{% if p.anki and not (p.decks.values()|sum(attribute='mature') + p.decks.values()|sum(attribute='young')) %}<div class="note">Every card in this file looks new. If you have studied this deck, export it again from Anki with &ldquo;Include scheduling information&rdquo; ticked.</div>{% endif %}
+<table><tr><th>Deck</th><th></th><th>Mature</th><th>Young or learning</th><th>Not started</th><th>No single word</th>{% if p.anki %}<th>With history</th>{% endif %}<th>Take</th></tr>
+{% for deck in p.decks|sort %}{% set d = p.decks[deck] %}{% set cur = p.imports[deck].mode if deck in p.imports else 'progress' %}
+<tr><td>{{ deck }}</td><td class="small mute">{{ 'kanji' if d.kanji else '' }}{% if d.with_sentence %}{{ d.with_sentence }} with a sentence{% endif %}</td><td><b>{{ d.mature }}</b></td><td>{{ d.young }}</td><td>{{ d.new }}</td><td class="mute">{{ d.unusable }}</td>{% if p.anki %}<td class="mute">{{ d.history }}</td>{% endif %}
+ <td><select name="mode-{{ loop.index0 }}">{% for val, label in modes %}<option value="{{ val }}" {{ 'selected' if val == cur }}>{{ label }}{% if val == 'studied' %} (+{{ d.mature + d.young }} cards){% elif val == 'all' %} (+{{ d.mature + d.young + d.new }} cards){% endif %}</option>{% endfor %}</select></td></tr>
+{% endfor %}</table>
+<div class="row"><button class="primary" name="action" value="apply">Import</button><button name="action" value="preview">Count again</button>
+<span class="small mute">{% if p.anki %}Review history is replayed where the file holds it.{% else %}States are estimated from the mastery percentage.{% endif %} &ldquo;Progress only&rdquo; adds no cards.</span></div>
+</form>
+{% endblock %}

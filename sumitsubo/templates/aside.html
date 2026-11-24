@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Suspended · Sumitsubo{% endblock %}
+{% macro rows(items, was, button) %}
+<table>{% for w in items %}<tr data-item="{{ w.id }}" data-was="{{ was }}">
+  <td style="width:5.2rem"><span class="kind">{{ 'Kanji' if w.kind == 'kanji' else 'Word' }}</span></td>
+  <td class="ja">{{ w.lemma }}<span class="mute small">【{{ w.reading }}】</span></td><td class="small">{{ w.gloss }}</td>
+  <td class="small mute">{{ w.title or '' }}</td>
+  <td style="white-space:nowrap"><span class="acts"><button class="tiny" onclick="setStatus({{ w.id }}, '{{ 'undo' if was == 'learning' else 'learning' }}', this, '{{ was }}')">{{ button }}</button></span></td></tr>{% endfor %}</table>
+{% endmacro %}
+{% block main %}
+<div class="toolbar"><h1>Suspended and marked by hand</h1><a class="btn" href="/cards">All cards</a></div>
+
+<h2>Suspended <span class="mute small">{{ ignored|length }}</span></h2>
+{% if ignored %}{{ rows(ignored, 'ignored', 'Learn this') }}{% else %}<p class="mute">Nothing ignored.</p>{% endif %}
+
+<h2>&ldquo;I know this&rdquo; <span class="mute small">{{ known|length }}</span></h2>
+<p class="small mute">Put in review about a year out, to be checked once.</p>
+{% if known %}{{ rows(known, 'known', 'Learn this') }}{% else %}<p class="mute">Nothing marked by hand. Words your level covers are listed on each source page under &ldquo;Mature words&rdquo;.</p>{% endif %}
+
+<h2>&ldquo;Learn this&rdquo; <span class="mute small">{{ forced|length }}</span></h2>
+<p class="small mute">Kept New whatever your level or an import says.</p>
+{% if forced %}{{ rows(forced, 'learning', 'Take back') }}{% else %}<p class="mute">None.</p>{% endif %}
+
+<h2>Bad sentences <span class="mute small">{{ rejected|length }}</span></h2>
+{% if rejected %}<table>{% for r in rejected %}<tr><td class="ja">{{ r.text }}</td><td class="small mute">{{ r.title or '' }}</td>
+  <td><form method="post" action="/sentence/restore"><input type="hidden" name="source_id" value="{{ r.source_id }}"><input type="hidden" name="text" value="{{ r.text }}"><button class="tiny">Use again</button></form></td></tr>{% endfor %}</table>
+{% else %}<p class="mute">No sentences marked as bad.</p>{% endif %}
+
+{% if auto %}<details style="margin-top:1.5rem"><summary class="mute small">{{ auto|length }} short grammatical expressions set aside automatically</summary>
+<p class="small mute">Kana-only expressions such as について. They get no cards for now; grammar is planned for a later version.</p>
+{{ rows(auto, 'ignored', 'Learn this') }}</details>{% endif %}
+{% endblock %}

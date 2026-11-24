@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Send pages · Sumitsubo</title>
+<style>
+:root { --bg:#f7f5f0; --fg:#1f2328; --mute:#6b6f76; --line:#dedad0; --card:#fffefb; --good:#5d7a58; --bad:#b3523b }
+@media (prefers-color-scheme: dark) { :root { --bg:#17181a; --fg:#e8e4da; --mute:#9a9da3; --line:#303338; --card:#1f2124 } }
+body { margin:0; padding:1rem; background:var(--bg); color:var(--fg); font:17px/1.5 system-ui, sans-serif }
+h1 { font-size:1.25rem; margin:.2rem 0 .2rem } p { margin:.4rem 0 } .mute { color:var(--mute); font-size:.9rem }
+label.big { display:block; text-align:center; padding:1.1rem; margin:.8rem 0; border-radius:12px; font-size:1.15rem; font-weight:600; border:1px solid var(--line); background:var(--card) }
+label.cam { background:var(--fg); color:var(--bg); border-color:var(--fg) }
+input[type=file] { display:none }
+ul { list-style:none; padding:0; margin:1rem 0 } li { display:flex; gap:.6rem; padding:.5rem 0; border-bottom:1px solid var(--line); align-items:baseline }
+li span:first-child { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap } .ok { color:var(--good) } .poor, .error { color:var(--bad) }
+</style>
+</head>
+<body>
+<h1>Send pages to Sumitsubo</h1>
+<p class="mute">One page per photo, held flat, filling the frame, without the shadow of the phone.</p>
+<label class="big cam">Photograph a page<input type="file" accept="image/*" capture="environment" onchange="send(this)"></label>
+<label class="big">Choose photos or a PDF<input type="file" accept="image/*,.heic,.heif,application/pdf" multiple onchange="send(this)"></label>
+<p id="sum" class="mute"></p>
+<ul id="list"></ul>
+<p class="mute">When you are done, go to Inbox on the computer to choose the pages and make a source.</p>
+<script>
+const base = location.pathname.replace(/\/$/, ''), list = document.getElementById('list'), rows = {};
+let n = 0, queue = Promise.resolve();
+function line(name) { const li = document.createElement('li'), a = document.createElement('span'), b = document.createElement('span');
+  a.textContent = (++n) + '. ' + name; b.textContent = 'sending…'; li.append(a, b); list.prepend(li); return b; }
+function send(input) {
+  for (const f of [...input.files]) { const cell = line(f.name);
+    queue = queue.then(async () => {
+      try { const fd = new FormData(); fd.append('files', f, f.name);
+        const r = await fetch(base + '/upload', {method:'POST', body:fd});
+        if (!r.ok) throw new Error('refused (' + r.status + ')');
+        const res = await r.json();
+        if (res.errors.length) { cell.textContent = res.errors[0]; cell.className = 'error'; }
+        else if (res.ids.length === 1) { rows[res.ids[0]] = cell; cell.textContent = 'sent, waiting to be read'; }
+        else { cell.textContent = res.ids.length + ' pages sent'; cell.className = 'ok'; }
+      } catch (e) { cell.textContent = 'not sent: ' + e.message; cell.className = 'error'; }
+    }); }
+  input.value = '';
+}
+setInterval(async () => {
+  const ids = Object.keys(rows); if (!ids.length) return;
+  try { for (const s of await (await fetch(base + '/status?ids=' + ids.join(','))).json()) {
+    const cell = rows[s.id]; if (!cell) continue;
+    if (s.status === 'ok') { cell.textContent = 'read well (' + s.conf + ')'; cell.className = 'ok'; delete rows[s.id]; }
+    else if (s.status === 'poor') { cell.textContent = 'take it again: ' + s.message; cell.className = 'poor'; delete rows[s.id]; }
+    else if (s.status === 'error') { cell.textContent = s.message; cell.className = 'error'; delete rows[s.id]; }
+    else if (s.status === 'reading') cell.textContent = 'reading…';
+  } } catch (e) {}
+}, 2500);
+</script>
+</body>
+</html>

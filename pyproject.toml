@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sumitsubo"
+version = "0.8.3"
+description = "Turn Japanese talks, papers and books into word, listening and kanji-in-context cards, with a difficulty score for each source"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+dependencies = [
+  # Word analysis and ingest. Pinned to an exact commit: Sumitsubo imports its parser directly.
+  "anki-miner @ git+https://github.com/0xzerolight/anki_miner@fb8853ba0fd85750df09e3e6da51b7de0511fcd6",
+  "fastapi", "uvicorn", "jinja2", "python-multipart",
+  "genanki",
+  "Pillow>=10", "pillow-heif", "pypdfium2", "segno",   # page photos: tidy, HEIC, PDF pages, the code to scan
+  "onnxruntime", "opencv-python-headless", "networkx", "lxml", "pyyaml", "tqdm",   # what NDLOCR-Lite (fetched by `sumitsubo paper`) runs on
+  "fsrs>=6",
+  "zstandard; python_version < '3.14'",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "httpx", "jamdict", "jamdict-data"]
+ocr = ["ocrmypdf"]
+
+[project.scripts]
+sumitsubo = "sumitsubo.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sumitsubo*"]
+
+[tool.setuptools.package-data]
+sumitsubo = ["templates/*.html", "data/*"]

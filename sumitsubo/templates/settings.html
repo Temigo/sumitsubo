@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Settings · Sumitsubo{% endblock %}
+{% block main %}
+{% if note %}<div class="note">{{ note }}</div>{% endif %}
+{% if tab == 'general' %}
+<div class="toolbar"><h1>General</h1></div>
+<form class="box" method="post" action="/settings" style="max-width:560px">
+  <div class="setrow" style="border-top:0"><span>Your level</span><select name="level" aria-label="Your level">{% for val, label in levels %}<option value="{{ val }}" {{ 'selected' if v.level == val }}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="setrow"><span>Meanings from</span><select name="gloss_dict" aria-label="Meanings from">{% for d in info.dicts %}<option {{ 'selected' if v.gloss_dict == d }}>{{ d }}</option>{% endfor %}</select></div>
+  <div class="setrow"><span class="small mute">Data folder: {{ data }}</span><button class="primary">Save</button></div>
+</form>
+{% elif tab == 'dictionaries' %}
+<div class="toolbar"><h1>Dictionaries</h1></div>
+{% if not info.registers %}<div class="note">This dictionary has no register labels. Run <code>sumitsubo setup</code> once more.</div>{% endif %}
+<section class="box" style="max-width:720px">
+  <form class="setrow" style="border-top:0" method="post" action="/settings/dictionary" enctype="multipart/form-data"><span><b>Dictionaries</b><span class="small mute" style="display:block">{{ info.dicts|join(', ') or 'none' }}{% if info.dict_version %} ({{ info.dict_version }}){% endif %}</span></span><input type="file" name="upload" accept=".zip" required aria-label="Yomitan dictionary"><button>Add</button></form>
+  <form class="setrow" method="post" action="/settings/glossary" enctype="multipart/form-data"><span><b>Glossaries</b><span class="small mute" style="display:block">{% for name, n in info.glossaries %}{{ name }}: {{ n }} terms{{ ', ' if not loop.last }}{% else %}none{% endfor %}</span></span><input type="file" name="upload" required aria-label="Glossary file"><button>Add</button></form>
+  <form class="setrow" method="post" action="/settings/pairs" enctype="multipart/form-data"><span><b>Collocation lists</b><span class="small mute" style="display:block">{% for name, n in info.pairs %}{{ name }}: {{ n }} pairs{{ ', ' if not loop.last }}{% else %}none{% endfor %}</span></span><input type="file" name="upload" accept=".tsv,.txt" required aria-label="Pair list"><button>Add</button></form>
+  <form class="setrow" method="post" action="/settings/frequency" enctype="multipart/form-data"><span><b>Word frequency</b><span class="small mute" style="display:block">{% if info.freq.ranks %}{{ info.freq.name }}, {{ info.freq.ranks }} words{% else %}none{% endif %}</span></span><input type="file" name="upload" accept=".csv,.zip,.txt" aria-label="Frequency list"><button name="action" value="file">Use file</button><button name="action" value="download">Download Jiten's</button></form>
+</section>
+{% else %}
+<div class="toolbar"><h1>Engines</h1></div>
+<section class="box" style="max-width:720px">
+  <form class="setrow" style="border-top:0" method="post" action="/settings/speech"><span><b>Speech recognition</b><span class="small mute" style="display:block">For videos without captions and for recordings</span></span><select name="model" aria-label="Model"><option>large-v3</option><option>small</option></select><button>Install</button></form>
+  <form class="setrow" method="post" action="/inbox/engine"><span><b>Page photos</b><span class="small mute" style="display:block">{{ 'NDLOCR-Lite' if paper.engine == 'ndl' else 'Tesseract' if paper.engine else 'not installed' }}{% if paper.missing %} &middot; {{ paper.missing }}{% endif %}</span></span>{% if paper.engine != 'ndl' %}<button>Install NDLOCR-Lite</button>{% endif %}</form>
+  <div class="setrow"><span><b>Scanned PDFs</b><span class="small mute" style="display:block">{{ info.ocr }}</span></span></div>
+  <div class="setrow"><span><b>Anki Miner</b><span class="small mute" style="display:block">{% if info.am_version %}{{ info.am_version }}{% else %}not available ({{ info.am_error }}){% endif %}</span></span></div>
+</section>
+{% endif %}
+{% endblock %}

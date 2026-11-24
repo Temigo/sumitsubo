@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Reader · Sumitsubo{% endblock %}
+{% block main %}
+{% if tab == 'sync' %}
+<div class="toolbar"><h1>Sync</h1></div>
+<section class="box" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px">
+  <form method="post" action="/sync" style="display:flex;flex-direction:column;gap:12px">
+    <label class="field">Address, or the card's folder<input type="text" name="where" value="{{ address }}"></label>
+    <div class="row"><button class="primary">Sync now</button></div></form>
+  <div><div class="label">Last sync{% if last %} &middot; {{ last.at }}{% endif %}</div>
+    {% if last %}{% for line in last.lines %}<div class="setrow" style="padding:7px 0">{{ line }}</div>{% endfor %}{% else %}<div class="mute" style="margin-top:8px">Not yet.</div>{% endif %}</div>
+</section>
+{% elif tab == 'study' %}
+<div class="toolbar"><h1>Study</h1></div>
+{% if note %}<div class="note">{{ note }}</div>{% endif %}
+<form class="box" method="post" action="/reader/study" style="max-width:560px">
+  <div class="setrow" style="border-top:0"><span>New cards a day</span><input type="number" name="daily_budget" value="{{ daily }}" min="1" max="200" aria-label="New cards a day" style="width:80px"></div>
+  <div class="setrow"><span>More new cards after a session</span><select name="more_new" aria-label="More new cards">{% for val, label in [('once', 'Offer once'), ('never', 'Never'), ('free', 'Freely')] %}<option value="{{ val }}" {{ 'selected' if more == val }}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="setrow"><span>Contrast cards</span><select name="contrast_when" aria-label="Contrast cards">{% for val, label in choices %}<option value="{{ val }}" {{ 'selected' if when == val }}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="setrow"><span class="small mute">Sent with the deck at the next sync.</span><button class="primary">Save</button></div>
+</form>
+{% elif tab == 'books' %}
+<div class="toolbar"><h1>Books</h1></div>
+{% if books %}<section class="list">{% for b in books %}
+  <form class="lrow" method="post" action="/source/{{ b.id }}/reader" style="grid-template-columns:minmax(0,1fr) 150px 60px 60px">
+    <span style="min-width:0"><a class="t" href="/source/{{ b.id }}" style="color:var(--fg);text-decoration:none">{{ b.title }}</a><span class="small mute">{{ 'EPUB made here' if b.kind == 'aozora' else 'Your file' }}</span></span>
+    <label class="row small"><input type="checkbox" name="on" value="1" {{ 'checked' if b.to_reader }} onchange="this.form.submit()" style="width:16px;height:16px"> On the reader</label>
+    <a class="small" href="/source/{{ b.id }}/book">File</a><span class="pct">{{ b.cov.readable|round|int }}%</span></form>{% endfor %}</section>
+{% else %}<div class="box mute">No books yet.</div>{% endif %}
+{% else %}
+<div class="toolbar"><h1>New card</h1></div>
+{% if note %}<div class="note">{{ note }}</div>{% endif %}
+<form class="box" method="post" action="/reader/card" style="display:flex;flex-direction:column;gap:14px;max-width:560px">
+  <label class="field">The card's folder<input type="text" name="folder" placeholder="/media/card"></label>
+  <label class="row"><input type="checkbox" name="fonts" value="1" checked style="width:16px;height:16px"> Japanese fonts (95 MB)</label>
+  <div class="row"><button class="primary">Prepare the card</button><span class="small mute">Japanese dictionary (130 MB), fonts, deck</span></div>
+</form>
+{% endif %}
+{% endblock %}

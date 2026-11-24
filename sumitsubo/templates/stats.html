@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Statistics · Sumitsubo{% endblock %}
+{% macro tile(n, t) %}<div class="box" style="padding:16px 18px"><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums">{{ n }}</div><div class="small mute">{{ t }}</div></div>{% endmacro %}
+{% macro bars(days, peak, h=120, gap=6) %}<div style="display:flex;gap:{{ gap }}px;align-items:flex-end;height:{{ h }}px;margin-top:12px">{% for d in days %}<div title="{{ d.label }}: {{ d.n }}" role="img" aria-label="{{ d.label }}: {{ d.n }}" style="flex:1;height:{{ (100 * d.n / peak)|round|int }}%;min-height:2px;background:{{ 'var(--ink)' if loop.last else '#8a8e94' }};border-radius:3px 3px 0 0"></div>{% endfor %}</div>{% endmacro %}
+{% block main %}
+{% if tab == 'kanji' %}
+<div class="toolbar"><h1>Kanji</h1><span class="legend small mute"><i style="background:var(--known)"></i>mature<i style="background:var(--young)"></i>young<i style="background:var(--new)"></i>new</span></div>
+{% for lv in levels %}<section class="box"><div class="row" style="align-items:baseline;gap:10px"><b>{{ lv.name }}</b><span class="small mute">{{ lv.mature|num }} of {{ lv.cells|length|num }} mature{% if lv.young %} &middot; {{ lv.young|num }} young{% endif %}{% if lv.new %} &middot; {{ lv.new|num }} new{% endif %}</span></div>
+  <div class="kgrid">{% for k, b in lv.cells %}<i{% if b %} class="{{ b[0] }}"{% endif %}>{{ k }}</i>{% endfor %}</div></section>
+{% else %}<div class="box mute">The dictionary has not been built yet.</div>{% endfor %}
+{% elif tab == 'reviews' %}
+<div class="toolbar"><h1>Reviews</h1></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+  {{ tile(totals.reviews|num, 'reviews') }}{{ tile(totals.days|num, 'days studied') }}{{ tile(totals.streak|num, 'days in a row') }}{{ tile(totals.mean|num, 'a day, when studying') }}
+</div>
+<section class="box"><div class="label">Last 12 weeks</div>{{ bars(days, peak, 140, 2) }}
+  <div class="row small mute" style="justify-content:space-between;margin-top:6px"><span>{{ days[0].label }}</span><span>today: {{ days[-1].n }}</span></div></section>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+  <section class="box"><div class="label">Due in the next 14 days</div>
+    <div style="display:flex;gap:6px;align-items:flex-end;height:120px;margin-top:12px">{% for d in coming %}<div title="{{ d.label }}: {{ d.n }}" role="img" aria-label="{{ d.label }}: {{ d.n }} due" style="flex:1;height:{{ (100 * d.n / cpeak)|round|int }}%;min-height:2px;background:{{ 'var(--ink)' if loop.first else '#8a8e94' }};border-radius:3px 3px 0 0"></div>{% endfor %}</div>
+    <div class="row small mute" style="justify-content:space-between;margin-top:6px"><span>today: {{ coming[0].n }}</span><span>{{ coming[-1].label }}</span></div></section>
+  <section class="box"><div class="label">By month</div>
+    {% for mo in months %}<div class="setrow"><span>{{ mo.label }}</span><span class="small mute">{{ mo.days }} days</span><b style="font-variant-numeric:tabular-nums">{{ mo.n|num }}</b></div>{% else %}<div class="mute" style="margin-top:10px">No reviews yet.</div>{% endfor %}</section>
+</div>
+{% else %}
+<div class="toolbar"><h1>Statistics</h1></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+  {{ tile(words.mature|num, 'words mature') }}{{ tile(words.young|num, 'young or learning') }}{{ tile(words.new|num, 'new, waiting') }}{{ tile(kanji.mature|num, 'kanji readings mature') }}
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+  <section class="box"><div class="label">Words by state</div>
+    <div class="bar" style="height:14px;border-radius:7px;margin:12px 0 10px"><i class="k" style="width:{{ pct.mature }}%"></i><i class="y" style="width:{{ pct.young }}%"></i><i class="n" style="width:{{ pct.new }}%"></i></div>
+    <div class="row small mute" style="gap:20px"><span><b style="color:var(--fg)">{{ pct.mature }}%</b> mature</span><span><b style="color:var(--fg)">{{ pct.young }}%</b> young</span><span><b style="color:var(--fg)">{{ pct.new }}%</b> new</span></div></section>
+  <section class="box"><div class="row"><span class="label" style="flex:1">Reviews, last 14 days</span><a class="small" href="/stats/reviews">All</a></div>{{ bars(days, peak) }}
+    <div class="row small mute" style="justify-content:space-between;margin-top:6px"><span>{{ days[0].label }}</span><span>today: {{ days[-1].n }}</span></div></section>
+</div>
+{% if levels %}<section class="box"><div class="row"><span class="label" style="flex:1">Kanji by JLPT level</span><a class="small" href="/stats/kanji">Grid</a></div>
+  {% for lv in levels %}<div class="row" style="gap:14px;margin-top:12px"><b style="width:28px">{{ lv.name }}</b>
+    <div class="bar" style="flex:1;height:10px"><i class="k" style="width:{{ lv.pct.mature }}%"></i><i class="y" style="width:{{ lv.pct.young }}%"></i><i class="n" style="width:{{ lv.pct.new }}%"></i></div>
+    <span class="small mute" style="width:150px;text-align:right;font-variant-numeric:tabular-nums">{{ lv.mature|num }} of {{ lv.cells|length|num }} mature</span></div>{% endfor %}
+</section>{% endif %}
+{% endif %}
+{% endblock %}

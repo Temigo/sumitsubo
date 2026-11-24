@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Export · Sumitsubo{% endblock %}
+{% block main %}
+<div class="toolbar"><h1>Export</h1></div>
+<form class="box" method="get" action="/export/anki" style="display:flex;flex-direction:column;gap:16px">
+  <div class="label">Anki deck</div>
+  {% if export_tags %}<div><div class="small mute">Tags</div>{% for t in export_tags %}<label class="pick"><input type="checkbox" name="tag" value="{{ t }}" {{ 'checked' if t == tag }}> {{ t }}</label>{% endfor %}</div>{% endif %}
+  <div><div class="small mute">Sources (none ticked: all)</div>{% for s in sources %}<label class="pick"><input type="checkbox" name="source" value="{{ s.id }}" {{ 'checked' if s.id == source }}> {{ s.title }} <span class="mute small">{{ s.n }}</span></label>{% endfor %}</div>
+  <div><div class="small mute">Kinds</div>{% for val, label in [('word', 'Word'), ('colloc', 'Collocation'), ('listen', 'Listening'), ('kanji', 'Kanji')] %}<label class="pick"><input type="checkbox" name="kind" value="{{ val }}" checked> {{ label }}</label>{% endfor %}
+    <label class="pick"><input type="checkbox" name="mature" value="1"> Include mature cards</label></div>
+  <label class="row"><input type="checkbox" name="progress" value="1" checked style="width:16px;height:16px"> With my progress</label>
+  <div class="row"><label class="field" style="max-width:16rem">Deck name<input type="text" name="deck" value="Sumitsubo"></label>
+    <label class="field" style="max-width:16rem">Layout<select name="layout"><option value="split">A sub-deck per source</option><option value="one">One deck</option></select></label></div>
+  <div class="row" style="border-top:1px solid var(--line);padding-top:16px"><button class="primary">Export to Anki</button></div>
+</form>
+<form class="box row" method="post" action="/export/pack"><div class="label grow">Packs on disk</div>{% if source %}<input type="hidden" name="source" value="{{ source }}">{% endif %}<button>Write packs</button></form>
+{% endblock %}

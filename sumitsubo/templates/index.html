@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block title %}Sources · Sumitsubo{% endblock %}
+{% block pane %}{% if tags %}<h3>Tags</h3>
+<a class="f{{ ' on' if not tag }}" href="/"><span>All</span></a>
+{% for t in tags %}<a class="f{{ ' on' if t.name == tag }}" href="/?tag={{ t.name|urlencode }}"><span>{{ t.name }}</span><em>{{ t.n }}</em></a>{% endfor %}{% endif %}{% endblock %}
+{% block main %}
+<form class="toolbar" method="get"><h1>Sources</h1>
+  {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Search" aria-label="Search sources" style="width:200px">
+  <select name="order" aria-label="Order" onchange="this.form.submit()">{% for val, label in [('readable', 'Most readable'), ('new', 'Newest'), ('study', 'Study order')] %}<option value="{{ val }}" {{ 'selected' if order == val }}>{{ label }}</option>{% endfor %}</select>
+</form>
+{% if chosen %}
+<section class="box split">
+  <div style="min-width:0;display:flex;flex-direction:column;gap:12px">
+    <div><div class="small mute">{{ chosen.kind|kindname }}{% for t in chosen.tags %} &middot; {{ t }}{% endfor %} &middot; {{ chosen.n_sentences|num }} sentences{% if chosen.to_reader and chosen.book %} &middot; on the reader{% endif %}</div>
+    <h2 class="serif" style="font-size:19px;margin:4px 0 0">{{ chosen.title }}</h2></div>
+    <div class="row"><a class="btn primary" href="/source/{{ chosen.id }}">Open</a><a class="btn" href="/source/{{ chosen.id }}?show=cards">Cards</a><a class="btn" href="/source/{{ chosen.id }}?show=text">Text</a></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">{{ m.figures(chosen) }}</div>
+</section>
+{% endif %}
+{% if sources or rest %}
+<section class="list">
+  {% for s in rest %}
+  <div class="lrow" style="grid-template-columns:minmax(0,1fr) 170px 150px">
+    <span style="min-width:0"><span class="t">{{ s.title }}</span><span class="small cut {{ 'err' if s.status == 'error' else 'mute' }}" style="display:block" title="{{ s.message or '' }}">{% if s.status == 'error' %}{{ s.message }}{% else %}{{ s.kind|kindname }}{% endif %}</span></span>
+    {% if s.status == 'error' %}<span></span><form method="post" action="/source/{{ s.id }}/retry" style="text-align:right"><button class="tiny">Try again</button> <a class="btn tiny" href="/source/{{ s.id }}">Open</a></form>
+    {% else %}<div class="bar" data-bar="{{ s.id }}" style="{{ '' if s.total else 'visibility:hidden' }}"><i class="p" style="width:{{ (100 * s.done / s.total)|round|int if s.total else 0 }}%"></i></div>
+    <span class="small mute" style="text-align:right" data-pending="{{ s.id }}">{% if s.steps %}Step {{ s.step }} of {{ s.steps }}: {{ s.stage }}{% else %}{{ s.status }}{% endif %}</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% for s in sources %}
+  <a class="lrow{{ ' on' if chosen and s.id == chosen.id }}" href="{{ pager.link }}{{ '&' if '=' in pager.link else '' }}p={{ pager.page }}&sel={{ s.id }}" ondblclick="location.href='/source/{{ s.id }}'" style="grid-template-columns:minmax(0,1fr) 170px 60px">
+    <span style="min-width:0"><span class="t">{{ s.title }}</span><span class="small mute">{{ s.kind|kindname }}{% for t in s.tags %} &middot; {{ t }}{% endfor %}{% if s.to_reader and s.book %} &middot; on the reader{% endif %}</span></span>
+    {{ m.bar(s.cov) }}<span class="pct">{{ s.cov.readable|round|int }}%</span>
+  </a>
+  {% endfor %}
+</section>
+{{ m.pages(pager) }}
+{% else %}<div class="box"><p style="margin:0 0 12px">{% if q or tag %}No source matches.{% else %}Nothing here yet.{% endif %}</p><a class="btn primary" href="/add">Add a source</a></div>{% endif %}
+{% endblock %}
+{% block script %}{% if busy %}<script>
+setInterval(async () => { let r; try { r = await (await fetch('/status')).json(); } catch (e) { return; }
+  if (!r.some(s => s.status === 'queued' || s.status === 'processing')) { location.reload(); return; }
+  r.forEach(s => { const el = document.querySelector('[data-pending="' + s.id + '"]'); if (!el) return;
+    el.textContent = (s.steps ? 'Step ' + s.step + ' of ' + s.steps + ': ' + (s.stage || '') : s.status) + (s.quiet ? ' · no progress for ' + Math.floor(s.quiet / 60) + ' min' : '');
+    const bar = document.querySelector('[data-bar="' + s.id + '"]');
+    if (bar) { bar.style.visibility = s.total ? 'visible' : 'hidden'; bar.firstElementChild.style.width = (s.total ? Math.round(100 * s.done / s.total) : 0) + '%'; bar.title = s.total ? s.done + ' of ' + s.total + (s.unit ? ' ' + s.unit : '') : ''; } }); }, 1000);
+</script>{% endif %}{% endblock %}

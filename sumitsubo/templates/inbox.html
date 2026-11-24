@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Inbox · Sumitsubo{% endblock %}
+{% block main %}
+<style>
+.pages { display:grid; grid-template-columns:repeat(auto-fill, minmax(168px, 1fr)); gap:12px }
+.pg { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.45rem; font-size:.82rem; position:relative }
+.pg.off { opacity:.55 } .pg img { width:100%; height:190px; object-fit:contain; background:#fff; border-radius:4px; display:block }
+.pg .n { position:absolute; top:.6rem; left:.6rem; background:var(--ink); color:var(--bg); border-radius:99px; min-width:1.5rem; text-align:center; padding:0 .35rem; font-weight:600 }
+.pg .n:empty { display:none } .pg .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin:.25rem 0 .1rem }
+.pg .q.ok { color:var(--known) } .pg .q.poor, .pg .q.error { color:var(--new) }
+.qr svg { display:block; border-radius:6px }
+</style>
+<div class="toolbar"><h1>Add a source</h1></div>
+{% if note %}<div class="note err">{{ note }}</div>{% endif %}
+{% if engine != 'ndl' %}<div class="note row"><span style="flex:1">Pages are read by Tesseract, which is weak on vertical text and furigana. NDLOCR-Lite reads them far better (160 MB, once).</span>
+<form method="post" action="/inbox/engine"><button class="primary">Install it</button></form></div>
+{% elif old %}<div class="note">{{ old }} page{{ 's' if old != 1 }} here were read by Tesseract. Tick them and choose &ldquo;Read as: automatic&rdquo; to read them again.</div>{% endif %}
+{% if missing %}<div class="note err">Pages cannot be read yet: {{ missing }}. Run <code>{{ install }}</code> and reload.</div>{% endif %}
+<section class="box" style="display:flex;flex-direction:column;gap:18px">
+  <div class="seg" style="align-self:flex-start"><a href="/add?way=link">Link</a><a href="/add?way=file">File</a><a href="/add?way=text">Text</a><a class="on" href="/inbox">Page photos</a></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px;align-items:start">
+    <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:nowrap">{% if link %}<div class="qr">{{ qr|safe }}</div>
+      <div><div class="label">From your phone</div><div style="margin-top:6px">Scan on the same Wi-Fi, then photograph the pages.</div><div class="small mute" style="margin-top:4px;overflow-wrap:anywhere">{{ link }}</div></div>
+      {% else %}<div><div class="label">From your phone</div><div style="margin-top:6px">Start with <code>sumitsubo serve --phone</code> to get a code to scan.</div></div>{% endif %}</div>
+    <form method="post" action="/inbox/upload" enctype="multipart/form-data"><label class="field">From this computer: photos, or a PDF from a scanner app
+      <input type="file" name="files" multiple accept="image/*,.heic,.heif,application/pdf" onchange="this.form.submit()"></label></form>
+  </div>
+</section>
+
+{% if rows %}
+<form method="post" action="/inbox/act" id="acts" style="display:flex;flex-direction:column;gap:14px">
+<div class="row small">
+  <span class="label" style="margin-right:6px">Pages</span><span class="mute" id="count"></span> <span id="arrived"></span><span class="grow"></span>
+  <button type="button" class="tiny" onclick="tick(true)">Tick all</button><button type="button" class="tiny" onclick="tick(false)">None</button>
+  <select aria-label="Read the ticked pages as" onchange="if (this.value) { go('layout-' + this.value) }"><option value="">Read as&hellip;</option>{% for k, v in layouts.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+  <button class="tiny" name="act" value="turn" title="Turn the ticked pages a quarter to the right and read again">Turn &#8635;</button>
+  <button class="tiny" name="act" value="delete" onclick="return confirm('Delete the ticked photos?')">Delete</button>
+</div>
+<div class="pages" id="pages">
+{% for r in rows %}
+  <div class="pg {{ 'off' if r.status in ('poor','error') }}" data-id="{{ r.id }}" data-status="{{ r.status }}">
+    <span class="n"></span>
+    <a href="/inbox/{{ r.id }}/picture" target="_blank"><img loading="lazy" src="/inbox/{{ r.id }}/picture?small=1&v={{ r.status }}{{ r.layout }}" alt=""></a>
+    <div class="name" title="{{ r.name }}"><label><input type="checkbox" name="page" value="{{ r.id }}" {{ 'checked' if r.status not in ('poor','error') }} onchange="number()"> {{ r.name }}</label></div>
+    <div class="q {{ r.status }}"></div>
+    <div class="row" style="gap:.3rem; margin-top:.2rem; flex-wrap:nowrap">
+      <button type="button" class="tiny lay" onclick="one({{ r.id }}, this.dataset.to)" title="Read this page the other way"></button>
+      <a class="small" href="/inbox/{{ r.id }}/text" target="_blank" title="The text as it was read">text</a><span class="grow"></span>
+      <button type="button" class="tiny" onclick="move(this, -1)" title="Earlier">&#9664;</button><button type="button" class="tiny" onclick="move(this, 1)" title="Later">&#9654;</button>
+    </div>
+  </div>
+{% endfor %}
+</div>
+<section class="box" style="display:flex;flex-direction:column;gap:16px">
+  <div class="row" style="gap:14px"><label class="field">Title<input type="text" name="title"></label><label class="field">Tags<input type="text" name="tags"></label><label class="field">Series<input type="text" name="series"></label>
+  {% if paper %}<label class="field">Add to<select name="into"><option value="">A new source</option>{% for p in paper %}<option value="{{ p.id }}">{{ p.title }}</option>{% endfor %}</select></label>{% endif %}</div>
+  <div class="row" style="border-top:1px solid var(--line);padding-top:16px"><button class="primary" name="act" value="make">Add the ticked pages</button><span class="small mute">In the order shown. Pages read too poorly are left out.</span></div>
+</section>
+</form>
+{% endif %}
+{% endblock %}
+{% block script %}
+<script>
+const STATE = {{ rows|tojson }};
+const LAY = {h:'horizontal', v:'vertical'};
+function paint(s) {
+  const el = document.querySelector('.pg[data-id="' + s.id + '"]'); if (!el) return;
+  const q = el.querySelector('.q'), lay = el.querySelector('.lay'), box = el.querySelector('input');
+  const was = el.dataset.status; el.dataset.status = s.status;
+  q.className = 'q ' + s.status;
+  if (s.status === 'waiting') q.textContent = 'waiting to be read';
+  else if (s.status === 'reading') q.textContent = 'reading…';
+  else if (s.status === 'error') q.textContent = s.message;
+  else q.textContent = (s.status === 'ok' ? 'read well' : 'left out: ' + s.message) + ' · ' + s.conf + '/100';
+  q.title = s.hit === null ? '' : s.hit + '% of its words are in the dictionary';
+  const done = s.status === 'ok' || s.status === 'poor';
+  lay.style.visibility = done ? '' : 'hidden';
+  if (done && s.engine === 'ndl') { lay.textContent = LAY[s.layout]; lay.disabled = true; lay.title = 'Found line by line'; }
+  else if (done) { lay.textContent = LAY[s.layout] + (s.layout_set === 'auto' ? '' : ' (set)') + ' ⇄'; lay.dataset.to = s.layout === 'h' ? 'v' : 'h'; }
+  const bad = s.status === 'poor' || s.status === 'error';
+  el.classList.toggle('off', bad);
+  if (was !== s.status && (was === 'waiting' || was === 'reading')) { box.checked = !bad; number(); }
+}
+function number() {
+  let n = 0;
+  document.querySelectorAll('.pg').forEach(el => { el.querySelector('.n').textContent = el.querySelector('input').checked ? ++n : ''; });
+  const c = document.getElementById('count'); if (c) c.textContent = n + ' ticked';
+}
+function tick(on) { document.querySelectorAll('.pg input').forEach(b => b.checked = on); number(); }
+function move(btn, by) {
+  const el = btn.closest('.pg'), sib = by < 0 ? el.previousElementSibling : el.nextElementSibling;
+  if (sib) el.parentNode.insertBefore(by < 0 ? el : sib, by < 0 ? sib : el);
+  number();
+}
+function go(act) { const f = document.getElementById('acts'), i = document.createElement('input'); i.type = 'hidden'; i.name = 'act'; i.value = act; f.appendChild(i); f.submit(); }
+async function one(id, to) { await post('/inbox/act', {page: id, act: 'layout-' + to}); poll(); }
+async function poll() {
+  const rows = await (await fetch('/inbox/status')).json();
+  rows.forEach(paint);
+  const fresh = rows.filter(r => !document.querySelector('.pg[data-id="' + r.id + '"]')).length;
+  const a = document.getElementById('arrived');
+  if (a && fresh) a.innerHTML = '<b>' + fresh + ' new page' + (fresh > 1 ? 's' : '') + ' arrived.</b> <a href="/inbox">Show</a>';
+  else if (!a && fresh) location.reload();
+}
+STATE.forEach(paint); number();
+setInterval(poll, 2500);
+</script>
+{% endblock %}

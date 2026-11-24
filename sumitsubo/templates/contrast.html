@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block title %}Contrast cards · Sumitsubo{% endblock %}
+{% block main %}
+<div class="toolbar"><h1>Contrast cards</h1><a class="btn" href="/cards">All cards</a></div>
+<div class="seg" style="align-self:flex-start">
+  <a class="{{ 'on' if not kind }}" href="/contrast">All {{ counts.values()|sum|num }}</a>
+  {% for k, label in kinds.items() %}<a class="{{ 'on' if kind == k }}" href="/contrast?kind={{ k }}">{{ label }} {{ counts.get(k, 0)|num }}</a>{% endfor %}
+</div>
+{% if not components %}<div class="note">The list of look-alike kanji is missing from this installation, so only the other two kinds are made.</div>{% endif %}
+{% if cards %}<table>
+{% for c in cards %}<tr>
+  <td style="width:9rem"><span class="kind">{{ c.kind_label }}</span>
+    <div class="small mute" style="margin-top:.3rem">{% if c.memory %}<span class="state {{ c.memory.state }}">{{ c.memory.state }}</span> {{ c.memory.interval }}-day interval, {% if c.memory.due_days > 0 %}due in {{ c.memory.due_days }} days{% else %}due{% endif %}{% else %}<span class="state new">new</span>{% endif %}</div></td>
+  <td>{% if c.kind == 'keigo' %}<div class="row" style="gap:2.2rem;align-items:flex-start">{% for m in c.members %}<span><div class="small mute">{{ m.role }}{% if not m.met %} &middot; not met yet{% endif %}</div>
+      <div class="ja"><span class="target">{{ m.lemma }}</span><span class="mute small">【{{ m.reading }}】</span></div><div class="small mute">{{ m.gloss }}</div></span>{% endfor %}</div>
+    {% elif c.kind == 'sound' %}<div class="ja"><span class="target">{{ c.members[0].reading }}</span></div>
+      <div class="row" style="gap:1.5rem;margin-top:.2rem">{% for m in c.members %}<span><span class="ja">{{ m.lemma }}</span> <span class="small mute">{{ m.gloss }}</span></span>{% endfor %}</div>
+    {% else %}<div class="row" style="gap:2rem;align-items:flex-start">{% for m in c.members %}<span style="text-align:center"><span class="kanji">{{ m.lemma }}</span>
+      <div class="small"><span class="target">{{ m.reading }}</span></div>
+      {% if m.word %}<div class="ja" style="font-size:1rem">{{ m.word.lemma }}<span class="mute small">【{{ m.word.reading }}】</span></div><div class="small mute">{{ m.word.gloss }}</div>{% else %}<div class="small mute">{{ m.gloss }}</div>{% endif %}</span>{% endfor %}</div>{% endif %}</td>
+</tr>{% endfor %}
+</table>{% else %}<p class="mute">None yet. They appear as your sources bring in kanji and words that can be confused.</p>{% endif %}
+{{ m.pages(pager) }}
+{% endblock %}

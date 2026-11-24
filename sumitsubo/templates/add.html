@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block title %}Add a source · Sumitsubo{% endblock %}
+{% block main %}
+<div class="toolbar"><h1>Add a source</h1></div>
+{% if score %}<section class="box" style="display:flex;flex-direction:column;gap:14px">
+  <div class="row"><span class="label" style="flex:1">Difficulty check &middot; not added</span><span class="small mute">{{ score.sentences.total|num }} sentences</span></div>
+  <div class="t" style="font-size:16px;font-weight:600;overflow-wrap:anywhere">{{ score.label }}</div>
+  <div class="row" style="align-items:baseline;gap:10px"><span class="big">{{ score.readable|round|int }}%</span><span class="mute">readable today &middot; {{ score.tier }}</span></div>
+  {{ m.bar(score) }}
+  <div class="stats">
+    <div class="stat"><b>{{ score.sentences.readable|num }} of {{ score.sentences.total|num }}</b><span>sentences readable in full</span></div>
+    <div class="stat"><b>{{ score.sentences.one_away|num }}</b><span>one word away</span></div>
+    <div class="stat"><b>{{ score.unique.new|num }}</b><span>new words</span></div>
+    <div class="stat"><b>{{ score.unique.queued|num }}</b><span>new, already queued</span></div>
+    <div class="stat"><b>{{ score.kanji_new|num }}</b><span>new kanji readings</span></div>
+  </div>
+  <form class="row" method="post" action="/add" style="border-top:1px solid var(--line);padding-top:14px">
+    {% for k in ('target', 'text', 'title', 'tags', 'series', 'reader') %}<input type="hidden" name="{{ k }}" value="{{ again[k] }}">{% endfor %}<input type="hidden" name="kept_media" value="{{ again.media }}">
+    <button class="primary" name="action" value="add">Add it</button><a class="btn" href="/add">Discard</a></form>
+</section>{% endif %}
+<form class="box" method="post" action="/add" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:18px">
+  <div class="seg" style="align-self:flex-start" role="tablist">
+    {% for w, label in [('link', 'Link'), ('file', 'File'), ('text', 'Text')] %}<button type="button" class="{{ 'on' if way == w }}" data-way="{{ w }}">{{ label }}</button>{% endfor %}<a href="/inbox">Page photos</a></div>
+  <label class="field" data-for="link">Link<input type="text" name="target" id="link" autofocus style="font-size:16px;min-height:46px" placeholder="https://"></label>
+  <div class="row" data-for="link" id="what" style="display:none"><span style="width:8px;height:8px;border-radius:50%;background:var(--known)"></span><span></span></div>
+  <label class="field" data-for="file" style="display:none">File<input type="file" name="upload"></label>
+  <label class="field" data-for="file" style="display:none">Recording for a subtitle file (optional)<input type="file" name="media" accept="audio/*,video/*"></label>
+  <label class="field" data-for="text" style="display:none">Text<textarea name="text"></textarea></label>
+  <div class="row" style="gap:14px"><label class="field">Title<input type="text" name="title" placeholder="From the source"></label><label class="field">Tags<input type="text" name="tags"></label><label class="field">Series<input type="text" name="series"></label></div>
+  <label class="row" style="min-height:40px"><input type="checkbox" name="reader" value="1" style="width:18px;height:18px"> Send to the reader</label>
+  <div class="row" style="border-top:1px solid var(--line);padding-top:18px"><button class="primary" name="action" value="add">Add</button><button name="action" value="score">Check difficulty only</button></div>
+</form>
+{% endblock %}
+{% block script %}<script>
+document.querySelectorAll('[data-way]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-way]').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('[data-for]').forEach(x => x.style.display = x.dataset.for === b.dataset.way && (x.id !== 'what' || x.lastElementChild.textContent) ? '' : 'none'); });
+document.querySelector('[data-way="{{ way }}"]').click();
+const link = document.getElementById('link'), what = document.getElementById('what');
+link.oninput = () => { const u = link.value.trim().toLowerCase(); let t = '';
+  if (/aozora\.gr\.jp/.test(u)) t = 'Book from Aozora Bunko';
+  else if (/youtube\.com|youtu\.be|nicovideo|bilibili|vimeo/.test(u)) t = 'Video';
+  else if (/\.pdf(\?|$)/.test(u)) t = 'PDF'; else if (/\.epub(\?|$)/.test(u)) t = 'EPUB'; else if (/^https?:\/\/.+\..+/.test(u)) t = 'Web page';
+  what.lastElementChild.textContent = t; what.style.display = t ? '' : 'none'; };
+</script>{% endblock %}

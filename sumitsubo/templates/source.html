@@ -1,0 +1,67 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block title %}{{ s.title }} · Sumitsubo{% endblock %}
+{% block main %}
+<a class="small mute" href="/" style="text-decoration:none">&larr; Sources</a>
+<section class="box split" style="gap:32px">
+  <div style="min-width:0;display:flex;flex-direction:column;gap:12px">
+    <div><div class="small mute">{{ s.kind|kindname }}{% for t in tags %} &middot; {{ t }}{% endfor %} &middot; {{ (s.n_sentences or 0)|num }} sentences</div>
+    <h1 class="serif" style="font-size:22px;margin:4px 0 0">{{ s.title }}</h1></div>
+    <div class="row">
+      <a class="btn" href="/export?source={{ s.id }}">Export</a>
+      <button type="button" onclick="document.getElementById('edit').hidden = !document.getElementById('edit').hidden">Edit</button>
+      <form method="post" action="/source/{{ s.id }}/priority"><select name="priority" aria-label="Study order" onchange="this.form.submit()">{% for val, label in priorities.items() %}<option value="{{ val }}" {{ 'selected' if (s.priority or 2) == val }}>Study: {{ label|lower }}</option>{% endfor %}</select></form>
+      {% if s.kind != 'deck' %}<form method="post" action="/source/{{ s.id }}/retry"><button>Read again</button></form>
+      <form method="post" action="/source/{{ s.id }}/delete" onsubmit="return confirm('Delete this source and its cards?')"><button>Delete</button></form>{% endif %}
+    </div>
+    {% if s.book %}<form class="row" method="post" action="/source/{{ s.id }}/reader">
+      <label class="row"><input type="checkbox" name="on" value="1" {{ 'checked' if s.to_reader }} onchange="this.form.submit()" style="width:16px;height:16px"> Send to the reader</label>
+      <a class="small" href="/source/{{ s.id }}/book">{{ 'Download the EPUB' if s.kind == 'aozora' else 'Download the file' }}</a></form>{% endif %}
+    <form id="edit" hidden class="row" method="post" action="/source/{{ s.id }}/edit">
+      <label class="field">Title<input type="text" name="title" value="{{ s.title }}"></label><label class="field">Tags<input type="text" name="tags" value="{{ tags|join(', ') }}"></label>
+      <label class="field">Series<input type="text" name="series" value="{{ s.series or '' }}"></label><input type="hidden" name="priority" value="{{ s.priority or 2 }}"><button class="primary" style="align-self:flex-end">Save</button></form>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    {% if cov %}{{ m.figures({'cov': cov, 'when': when, 'added_cov': added}, 4) }}
+    {% elif s.status == 'error' %}<div class="err">{{ s.message }}</div>
+    {% else %}<div class="mute">{{ s.status }}{% if s.stage %}: {{ s.stage }}{% endif %}</div>{% endif %}
+  </div>
+</section>
+{% if s.kind == 'deck' %}<div class="note">Brought in from another program. Change or remove it under <a href="/imports">Imports</a>.</div>{% endif %}
+{% if paper %}<div class="note">Read from {{ paper.read }} of {{ paper.pages }} page photos (average confidence {{ paper.conf|round|int }} of 100): {{ paper.sentences }} sentences kept, {{ paper.doubtful }} left out because the reading was unsure.
+{% if paper.left_out %}<br><b>Left out, worth photographing again:</b> {% for p in paper.left_out %}page {{ p.n }} ({{ p.name }}: {{ p.why }}){{ ', ' if not loop.last }}{% endfor %}. Send the new photos to the <a href="/inbox">Inbox</a> and add them to this source.{% endif %}
+{% if photos %}<div class="row" style="gap:.6rem; margin:.6rem 0 .3rem; align-items:flex-start">{% for p in photos %}
+<div class="small" style="width:120px"><a href="/inbox/{{ p.id }}/picture" target="_blank" title="{{ p.name }}"><img loading="lazy" src="/inbox/{{ p.id }}/picture?small=1" alt="" style="width:120px; height:140px; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:4px; display:block"></a>
+p.{{ p.n }} &middot; {% if p.status == 'ok' %}{{ p.conf|round|int }}/100, {{ p.layout_name }}{% else %}<span class="err">left out</span>{% endif %}<br><a href="/inbox/{{ p.id }}/text" target="_blank">text as read</a></div>{% endfor %}</div>
+<span class="small mute">Press a photo to see it full size. &ldquo;Text as read&rdquo; shows everything recognised on that page, with the doubted words in &#10214;brackets&#10215;.</span>{% endif %}
+</div>
+{% elif ocr %}<div class="note">Read from a scan by character recognition ({{ ocr }} layout).</div>{% endif %}
+
+{% set q = '&all=1' if all else '' %}
+<nav class="tabs">
+  <a class="{{ 'on' if show == 'cards' }}" href="?show=cards">Cards to learn {{ tabs.cards|num }}</a>
+  <a class="{{ 'on' if show == 'known' }}" href="?show=known">Known words {{ tabs.known|num }}</a>
+  <a class="{{ 'on' if show == 'stack' }}" href="?show=stack">Started elsewhere {{ tabs.stack|num }}</a>
+  <a class="{{ 'on' if show == 'text' }}" href="?show=text">Text {{ tabs.text|num }}</a>
+  <a class="{{ 'on' if show == 'unknown' }}" href="?show=unknown">Not in the dictionary {{ tabs.unknown|num }}</a>
+</nav>
+{% if show == 'cards' %}
+  <div class="row small">
+    <a class="tag" style="{{ 'color:var(--fg);border-color:var(--fg)' if not kind }}" href="?show=cards{{ q }}">All kinds</a>
+    {% for val, label in [('word', 'Word'), ('kanji', 'Kanji'), ('colloc', 'Collocation'), ('listen', 'Listening')] %}<a class="tag" style="{{ 'color:var(--fg);border-color:var(--fg)' if kind == val }}" href="?show=cards&kind={{ val }}{{ q }}">{{ label }} {{ counts.get(val, 0)|num }}</a>{% endfor %}
+    <span class="grow"></span>{% if all %}<a href="?show=cards{{ '&kind=' ~ kind if kind }}">Hide mature cards</a>{% else %}<a href="?show=cards&all=1{{ '&kind=' ~ kind if kind }}">Include {{ n_mature|num }} mature cards</a>{% endif %}
+  </div>
+  {% if cards %}<section class="list">{% for c in cards %}{{ m.cardline(c) }}{% endfor %}</section>{% else %}<div class="box mute">No cards of this kind.</div>{% endif %}
+{% elif show == 'stack' %}
+  {% if stack %}<section class="list">{% for w in stack %}<div class="lrow" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 50px minmax(0,1fr)"><span class="ja cut"><b style="color:var(--fg)">{{ w.lemma }}</b>【{{ w.reading }}】</span><span class="small mute cut">{{ w.gloss }}</span><span>{{ w.n }}&times;</span><span class="small mute cut">{{ w.title }}</span></div>{% endfor %}</section>{% else %}<div class="box mute">None.</div>{% endif %}
+{% elif show == 'known' %}
+  {% if known %}<section class="list">{% for w in known %}<div class="lrow" data-item="{{ w.id }}" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 110px 50px 110px"><span class="ja cut lcell"><b style="color:var(--fg)">{{ w.lemma }}</b>【{{ w.reading }}】</span><span class="small mute cut lcell">{{ w.gloss }}</span>
+    <span class="small mute lcell" title="{{ w.m.why }}">{{ w.m.recall }}% &middot; {% if w.m.due_days > 0 %}{{ w.m.due_days }} d{% else %}due{% endif %}</span><span class="lcell">{{ w.n }}&times;</span>
+    <span class="acts" style="text-align:right"><button class="tiny" onclick="setStatus({{ w.id }}, 'learning', this)">Learn this</button></span></div>{% endfor %}</section>{% else %}<div class="box mute">None.</div>{% endif %}
+{% elif show == 'text' %}
+  <section class="list">{% for x in sentences %}<div class="lrow" style="grid-template-columns:90px minmax(0,1fr) auto;align-items:start"><span class="small mute">{{ x.location }}</span><span class="ja">{{ x.text }}</span>
+    <span>{% if x.clip %}<audio controls preload="none" src="/clip/{{ x.id }}"></audio>{% endif %}</span></div>{% endfor %}</section>
+{% elif show == 'unknown' %}
+  {% if unverified %}<div class="box ja">{% for u in unverified %}{{ u.form }} <span class="mute small">{{ u.n }}&times;</span>{% if not loop.last %}　{% endif %}{% endfor %}</div>{% else %}<div class="box mute">None.</div>{% endif %}
+{% endif %}
+{% if show != 'unknown' %}{{ m.pages(pager) }}{% endif %}
+{% endblock %}

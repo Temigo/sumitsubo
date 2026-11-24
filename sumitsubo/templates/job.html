@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ job.title }} · Sumitsubo{% endblock %}
+{% block main %}
+<div class="toolbar"><h1>{{ job.title }}</h1></div>
+<section class="box" style="display:flex;flex-direction:column;gap:12px">
+  <div id="stage" style="font-weight:600">{{ job.stage }} &hellip;</div>
+  <div class="bar" style="height:10px"><i class="k" id="fill" style="width:0%"></i></div>
+  <div class="small mute" id="detail"></div>
+</section>
+<p id="fail" class="note err" style="display:none"></p>
+<p id="back" style="display:none"><a class="btn" href="javascript:history.back()">Back</a></p>
+{% endblock %}
+{% block script %}<script>
+async function poll() {
+  let j;
+  try { j = await (await fetch('/job/status')).json(); } catch (e) { return setTimeout(poll, 1500); }
+  if (j.state === 'done') { location.href = j.url || '/'; return; }
+  if (j.state === 'error') {
+    document.getElementById('stage').textContent = 'It did not work.';
+    const f = document.getElementById('fail'); f.textContent = j.error; f.style.display = 'block';
+    document.getElementById('back').style.display = 'block'; return;
+  }
+  document.getElementById('stage').textContent = j.stage + (j.total ? ' (' + j.done + ' of ' + j.total + ')' : '') + ' …';
+  document.getElementById('fill').style.width = (j.total ? Math.round(100 * j.done / j.total) : 0) + '%';
+  document.getElementById('detail').textContent = j.seconds + ' s';
+  setTimeout(poll, 700);
+}
+poll();
+</script>{% endblock %}

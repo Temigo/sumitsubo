@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% import "_macros.html" as m %}
+{% block title %}Cards · Sumitsubo{% endblock %}
+{% macro f(label, n, on, href) %}<a class="f{{ ' on' if on }}" href="{{ href }}"><span>{{ label }}</span><em>{{ (n|num) if n is not none else '' }}</em></a>{% endmacro %}
+{% block pane %}
+{% set keep = ('&source=' ~ source if source else '') ~ ('&q=' ~ (q|urlencode) if q else '') %}
+<h3>Show</h3>
+{% for val, label in [('learn', 'To learn'), ('new', 'New'), ('young', 'Young'), ('mature', 'Mature'), ('all', 'All')] %}{{ f(label, counts.get(val) if val != 'all' else none, state == val, '/cards?state=' ~ val ~ ('&kind=' ~ kind if kind else '') ~ keep) }}{% endfor %}
+{{ f('Suspended', counts.suspended, state == 'suspended', '/cards?state=suspended') }}
+<h3>Kind</h3>
+{% set st = state if state not in ('', 'suspended') else 'learn' %}
+{{ f('All kinds', none, not kind and state != 'suspended', '/cards?state=' ~ st ~ keep) }}
+{% for val, label in [('word', 'Word'), ('kanji', 'Kanji'), ('colloc', 'Collocation'), ('listen', 'Listening')] %}{{ f(label, counts.get(val, 0), kind == val, '/cards?state=' ~ st ~ '&kind=' ~ val ~ keep) }}{% endfor %}
+{{ f('Contrast', counts.contrast, kind == 'contrast', '/cards?kind=contrast') }}
+{% endblock %}
+{% block main %}
+{% if marked or contrasts is not none %}<div class="toolbar"><h1>Cards</h1></div>
+{% else %}<form class="toolbar" method="get"><h1>Cards</h1>
+  <input type="hidden" name="state" value="{{ state }}">{% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+  <input type="search" name="q" value="{{ q }}" placeholder="Search" aria-label="Search cards" style="width:200px">
+  <select name="source" aria-label="Source" onchange="this.form.submit()" style="max-width:240px"><option value="0">All sources</option>{% for s in sources %}<option value="{{ s.id }}" {{ 'selected' if s.id == source }}>{{ s.title }}</option>{% endfor %}</select>
+  <a class="btn" href="/export{{ '?source=' ~ source if source else '' }}">Export</a>
+</form>{% endif %}
+{% if note %}<div class="note">{{ note }}</div>{% endif %}
+{% if chosen %}{% set c = chosen %}
+<section class="box" data-item="{{ c.item_id }}" style="display:grid;grid-template-columns:minmax(200px,300px) minmax(0,1fr);gap:28px;align-items:start">
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="label">The {{ 'kanji reading' if c.kind == 'kanji' else 'word' }}</div>
+    <div><div style="font-size:21px;font-weight:700">{{ c.lemma }}【{{ c.reading }}】</div><div class="mute">{{ c.gloss }}</div>
+      {% if c.other_readings %}<div class="small mute">Also read {{ c.other_readings|join('、') }}</div>{% endif %}</div>
+    <div class="row small mute">{{ c.label }} {{ m.chip(c) }}{% if c.register %}<span class="tag">{{ c.register }}</span>{% endif %}<a href="/source/{{ c.source_id }}">{{ c.source }}</a></div>
+    <div class="row acts"><button onclick="setStatus({{ c.item_id }}, 'known', this)">I know this {{ 'reading' if c.kind == 'kanji' else 'word' }}</button><button onclick="setStatus({{ c.item_id }}, 'ignored', this)">Suspend this {{ 'reading' if c.kind == 'kanji' else 'word' }}</button></div>
+  </div>
+  <div style="min-width:0">
+  {% if c.kind == 'kanji' %}<div class="label">Words it is shown in</div>
+    {% for w in c.words %}<div class="setrow"><span><span class="serif" style="font-size:16px">{{ w.lemma }}</span>【{{ w.reading }}】 <span class="mute small">{{ w.gloss }}</span></span></div>{% endfor %}
+  {% else %}<div class="label">Its sentences, shown in turn at review</div>
+    {% for x in c.sentences %}<div class="setrow"><span><span class="ja serif" style="display:block;font-weight:500">{{ x.parts[0] }}<b{% if c.kind == 'colloc' %} class="hidden"{% endif %}>{{ x.parts[1] }}</b>{{ x.parts[2] }}{{ m.reg(x.register) }}</span>
+      <span class="small mute">{{ x.source or c.source }}{% if x.location %} &middot; {{ x.location }}{% endif %}</span></span>
+      {% if x.clip %}<audio controls preload="none" src="/clip/{{ x.id }}" style="max-width:150px"></audio>{% endif %}<button class="tiny" onclick="badSentence({{ x.id }}, this)">Bad sentence</button></div>{% endfor %}
+    {% if c.hint %}<div class="small mute" style="padding-top:8px">Hint while young: {{ c.hint }}</div>{% endif %}
+  {% endif %}
+  </div>
+</section>
+{% endif %}
+{% if marked %}
+<div class="seg" style="align-self:flex-start">{% for key, label in marks %}<a class="{{ 'on' if marked.mark == key }}" href="/cards?state=suspended&mark={{ key }}">{{ label }} {{ marked.n[key]|num }}</a>{% endfor %}</div>
+{% if marked.rows and marked.mark == 'sentences' %}<section class="list">{% for r in marked.rows %}
+<div class="lrow" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto"><span class="ja serif">{{ r.text }}</span><span class="small mute cut">{% if r.why %}{{ r.why }} &middot; {% endif %}{{ r.title or '' }}</span>
+  <form method="post" action="/sentence/restore"><input type="hidden" name="source_id" value="{{ r.source_id }}"><input type="hidden" name="text" value="{{ r.text }}"><button class="tiny">Use again</button></form></div>{% endfor %}</section>
+{% elif marked.rows %}<section class="list">{% for w in marked.rows %}
+<div class="lrow" data-item="{{ w.id }}" data-was="{{ marked.was }}" style="grid-template-columns:60px minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr) auto">
+  <span class="small mute">{{ 'Kanji' if w.kind == 'kanji' else 'Word' }}</span>
+  <span class="cut"><b>{{ w.lemma }}【{{ w.reading }}】</b></span><span class="cut small mute">{{ w.gloss }}</span><span class="cut small mute">{{ w.title or '' }}</span>
+  <span class="acts"><button class="tiny" onclick="setStatus({{ w.id }}, '{{ 'undo' if marked.was == 'learning' else 'learning' }}', this, '{{ marked.was }}')">{{ 'Take back' if marked.was == 'learning' else 'Learn this' }}</button></span></div>{% endfor %}</section>
+{% else %}<div class="box mute">Nothing here.</div>{% endif %}
+{% elif contrasts is not none %}
+<div class="seg" style="align-self:flex-start">
+  <a class="{{ 'on' if not ck }}" href="/cards?kind=contrast">All {{ ccounts.values()|sum|num }}</a>
+  {% for k, label in ckinds.items() %}<a class="{{ 'on' if ck == k }}" href="/cards?kind=contrast&ck={{ k }}">{{ label }} {{ ccounts.get(k, 0)|num }}</a>{% endfor %}
+</div>
+{% if not components %}<div class="note">The list of look-alike kanji is missing from this installation, so only the other kinds are made.</div>{% endif %}
+{% if contrasts %}<section class="list">{% for c in contrasts %}
+<div class="lrow" style="grid-template-columns:150px minmax(0,1fr) 110px;align-items:start;padding-top:12px;padding-bottom:12px">
+  <span class="small mute">{{ c.kind_label }}</span>
+  {% if c.kind == 'keigo' %}<span class="row" style="gap:32px;align-items:flex-start">{% for x in c.members %}<span><span class="small mute" style="display:block">{{ x.role }}{% if not x.met %} &middot; not met yet{% endif %}</span>
+      <b>{{ x.lemma }}</b><span class="mute small">【{{ x.reading }}】</span><span class="small mute" style="display:block">{{ x.gloss }}</span></span>{% endfor %}</span>
+  {% elif c.kind == 'sound' %}<span><b>{{ c.members[0].reading }}</b>
+      <span class="row" style="gap:22px;margin-top:2px">{% for x in c.members %}<span>{{ x.lemma }} <span class="small mute">{{ x.gloss }}</span></span>{% endfor %}</span></span>
+  {% else %}<span class="row" style="gap:30px;align-items:flex-start">{% for x in c.members %}<span><span class="serif" style="font-size:26px;line-height:1.2">{{ x.lemma }}</span> <b class="small">{{ x.reading }}</b>
+      <span class="small mute" style="display:block">{% if x.word %}{{ x.word.lemma }}【{{ x.word.reading }}】 {{ x.word.gloss }}{% else %}{{ x.gloss }}{% endif %}</span></span>{% endfor %}</span>{% endif %}
+  <span style="text-align:right">{% if c.memory %}<span class="state {{ c.memory.state }}" title="{{ c.memory.interval }}-day interval, {% if c.memory.due_days > 0 %}due in {{ c.memory.due_days }} days{% else %}due{% endif %}">{{ c.memory.state }}</span>{% else %}<span class="state new">new</span>{% endif %}</span>
+</div>{% endfor %}</section>
+{% else %}<div class="box mute">None yet.</div>{% endif %}
+{% else %}
+{% if cards %}<section class="list">{% for c in cards %}
+<a class="lrow{{ ' on' if chosen and c.id == chosen.id }}" data-item="{{ c.item_id }}" href="{{ link }}&p={{ pager.page }}&sel={{ c.id }}" style="grid-template-columns:86px minmax(0,1.6fr) minmax(0,1fr) 70px">
+  <span class="small mute lcell">{{ c.label }}</span>
+  <span class="cut ja lcell">{% if c.kind == 'kanji' %}{{ c.lemma }}{% for w in c.words %}　{{ w.lemma }}{% endfor %}{% elif c.kind == 'colloc' %}{{ c.parts[0] }}<b class="hidden">{{ c.parts[1] }}</b>{{ c.parts[2] }}{% else %}{{ c.parts[0] }}<b>{{ c.parts[1] }}</b>{{ c.parts[2] }}{% endif %}</span>
+  <span class="cut lcell"><b style="color:var(--fg)">{{ c.lemma }}【{{ c.reading }}】</b> <span class="mute small">{{ c.gloss }}</span></span>
+  <span style="text-align:right">{{ m.chip(c) }}</span></a>{% endfor %}</section>
+{% else %}<div class="box mute">No cards match.</div>{% endif %}
+{% endif %}
+{{ m.pages(pager) }}
+{% endblock %}
